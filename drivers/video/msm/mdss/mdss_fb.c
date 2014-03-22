@@ -1139,6 +1139,8 @@ static int mdss_fb_alloc_fbmem(struct msm_fb_data_type *mfd)
 	}
 }
 
+static bool mdss_fb_registered = false;
+
 static int mdss_fb_register(struct msm_fb_data_type *mfd)
 {
 	int ret = -ENODEV;
@@ -1148,6 +1150,9 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 	struct fb_fix_screeninfo *fix;
 	struct fb_var_screeninfo *var;
 	int *id;
+
+	if (mdss_fb_registered)
+		return ret;
 
 	/*
 	 * fb info initialization
@@ -1356,6 +1361,8 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 		mfd->op_enable = false;
 		return -EPERM;
 	}
+
+	mdss_fb_registered = true;
 
 	pr_info("FrameBuffer[%d] %dx%d size=%d registered successfully!\n",
 		     mfd->index, fbi->var.xres, fbi->var.yres,
