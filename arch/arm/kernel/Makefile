@@ -89,3 +89,6 @@ obj-$(CONFIG_SMP)		+= psci_smp.o
 endif
 
 extra-y := $(head-y) vmlinux.lds
+
+CFLAGS_process.o := $(DISABLE_LTO)
+CFLAGS_kprobes.o := $(DISABLE_LTO)
