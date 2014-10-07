@@ -106,7 +106,7 @@ static void usb_gadget_state_work(struct work_struct *work)
 {
 	struct usb_gadget	*gadget = work_to_gadget(work);
 
-	sysfs_notify(&gadget->dev.kobj, NULL, "status");
+	sysfs_notify(&gadget->dev.kobj, NULL, "state");
 }
 
 void usb_gadget_set_state(struct usb_gadget *gadget,
