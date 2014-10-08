@@ -943,3 +943,9 @@ config STRICT_MEMORY_RWX
 	  1M boundaries (because their permissions are different and
 	  splitting the 1M pages into 4K ones causes TLB performance
 	  problems), wasting memory.
+
+config ARCH_SUPPORTS_BIG_ENDIAN
+	bool
+	help
+	  This option specifies the architecture can support big endian
+	  operation.
