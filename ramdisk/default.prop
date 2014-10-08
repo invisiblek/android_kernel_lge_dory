@@ -9,3 +9,4 @@ ro.adb.secure=1
 persist.adb.notify=0
 bluetooth.force_pm_timer=2000
 persist.sys.usb.config=none
+androidboot.selinux=0

@@ -44,7 +44,7 @@ cd $KERNELDIR
 
 echo "Making new boot image"
 gcc -w -s -pipe -O2 -Itools/libmincrypt -o tools/mkbootimg/mkbootimg tools/libmincrypt/*.c tools/mkbootimg/mkbootimg.c
-tools/mkbootimg/mkbootimg --kernel $KERNELDIR/arch/arm/boot/zImage-dtb --ramdisk $RAMFS_TMP.cpio.lzo --cmdline 'androidboot.hardware=dory user_debug=31 maxcpus=4 msm_rtb.filter=0x3F console=null androidboot.console=null' --base 0x00000000 --pagesize 2048 --kernel_offset 0x00008000 --ramdisk_offset 0x02000000 --tags_offset 0x01e00000 --second_offset 0x00f00000 -o $KERNELDIR/boot.img
+tools/mkbootimg/mkbootimg --kernel $KERNELDIR/arch/arm/boot/zImage-dtb --ramdisk $RAMFS_TMP.cpio.lzo --cmdline 'androidboot.hardware=dory user_debug=31 maxcpus=4 msm_rtb.filter=0x3F console=null androidboot.console=null enforcing=0' --base 0x00000000 --pagesize 2048 --kernel_offset 0x00008000 --ramdisk_offset 0x02000000 --tags_offset 0x01e00000 --second_offset 0x00f00000 -o $KERNELDIR/boot.img
 if [ "${1}" = "CC=\$(CROSS_COMPILE)gcc" ] ; then
 	dd if=/dev/zero bs=$((23068672-$(stat -c %s boot.img))) count=1 >> boot.img
 fi

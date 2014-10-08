@@ -16,6 +16,9 @@ on init
     symlink /storage/emulated/legacy /storage/sdcard0
     symlink /mnt/shell/emulated/0 /storage/emulated/legacy
 
+    setenforce 0
+    setprop ro.boot.selinux 0
+
 on post-fs-data
     mkdir /data/media 0770 media_rw media_rw
     mkdir /data/misc/batteryd 0700 system system
