@@ -1,0 +1,151 @@
+on init
+    # See storage config details at http://source.android.com/tech/storage/
+    mkdir /mnt/shell/emulated 0700 shell shell
+    mkdir /storage/emulated 0555 root root
+
+    # Set permissions for persist partition
+    mkdir /persist 0771 system system
+
+    export EXTERNAL_STORAGE /storage/emulated/legacy
+    export EMULATED_STORAGE_SOURCE /mnt/shell/emulated
+    export EMULATED_STORAGE_TARGET /storage/emulated
+
+    # Support legacy paths
+    symlink /storage/emulated/legacy /sdcard
+    symlink /storage/emulated/legacy /mnt/sdcard
+    symlink /storage/emulated/legacy /storage/sdcard0
+    symlink /mnt/shell/emulated/0 /storage/emulated/legacy
+
+on post-fs-data
+    mkdir /data/media 0770 media_rw media_rw
+    mkdir /data/misc/batteryd 0700 system system
+
+    # CPU frequency, suspend and governor
+    write /sys/module/lpm_levels/enable_low_power/l2 4
+    write /sys/module/msm_pm/modes/cpu0/power_collapse/suspend_enabled 1
+    write /sys/module/msm_pm/modes/cpu1/power_collapse/suspend_enabled 1
+    write /sys/module/msm_pm/modes/cpu2/power_collapse/suspend_enabled 1
+    write /sys/module/msm_pm/modes/cpu3/power_collapse/suspend_enabled 1
+    write /sys/module/msm_pm/modes/cpu0/standalone_power_collapse/suspend_enabled 1
+    write /sys/module/msm_pm/modes/cpu1/standalone_power_collapse/suspend_enabled 1
+    write /sys/module/msm_pm/modes/cpu2/standalone_power_collapse/suspend_enabled 1
+    write /sys/module/msm_pm/modes/cpu3/standalone_power_collapse/suspend_enabled 1
+    write /sys/module/msm_pm/modes/cpu0/standalone_power_collapse/idle_enabled 1
+    write /sys/module/msm_pm/modes/cpu1/standalone_power_collapse/idle_enabled 1
+    write /sys/module/msm_pm/modes/cpu2/standalone_power_collapse/idle_enabled 1
+    write /sys/module/msm_pm/modes/cpu3/standalone_power_collapse/idle_enabled 1
+    write /sys/module/msm_pm/modes/cpu0/power_collapse/idle_enabled 1
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "ondemand"
+    write /sys/devices/system/cpu/cpufreq/ondemand/sampling_rate 50000
+    write /sys/devices/system/cpu/cpufreq/ondemand/up_threshold 90
+    write /sys/devices/system/cpu/cpufreq/ondemand/io_is_busy 1
+    write /sys/devices/system/cpu/cpufreq/ondemand/sampling_down_factor 4
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq 300000
+
+    setprop vold.post_fs_data_done 1
+
+on boot
+    mount debugfs /sys/kernel/debug /sys/kernel/debug
+    chown system system /sys/kernel/debug/kgsl/proc
+
+    setprop ro.radio.noril yes
+
+    # Set up kernel tracing, but disable it by default
+    chmod 0222 /sys/kernel/debug/tracing/trace_marker
+    write /sys/kernel/debug/tracing/tracing_on 0
+
+    # Touch y inversion
+    write /sys/class/input/input0/flipy 1
+
+    chmod 0600 /dev/ttyHS99
+    chown bluetooth bluetooth /dev/ttyHS99
+
+    chmod 0600 /sys/class/rfkill/rfkill0/type
+    chown bluetooth bluetooth /sys/class/rfkill/rfkill0/type
+
+    chmod 0600 /sys/class/rfkill/rfkill0/state
+    chown bluetooth bluetooth /sys/class/rfkill/rfkill0/state
+
+
+    # fuel gauge learned parameters
+    chown system system /sys/class/power_supply/bms/device/learned
+
+    # usb configuration
+    write /sys/class/android_usb/android0/iSerial ${ro.serialno}
+    write /sys/class/android_usb/android0/iManufacturer ${ro.product.manufacturer}
+    write /sys/class/android_usb/android0/iProduct ${ro.product.model}
+
+    # adsp subsystem restart
+    write /sys/bus/msm_subsys/devices/subsys0/restart_level "related"
+
+on fs
+    mount_all /fstab.dory
+    setprop ro.crypto.fuse_sdcard true
+
+on post-fs
+    restorecon_recursive /persist
+
+    # Load ADSP firmware
+    write /sys/kernel/boot_adsp/boot 1
+
+    # mount functionfs for adbd
+    mkdir /dev/usb-ffs 0770 shell shell
+    mkdir /dev/usb-ffs/adb 0770 shell shell
+    mount functionfs adb /dev/usb-ffs/adb uid=2000,gid=2000
+    write /sys/class/android_usb/android0/f_ffs/aliases adb
+
+on property:sys.boot_completed=1
+    write /sys/devices/system/cpu/cpu1/online 0
+    write /sys/devices/system/cpu/cpu2/online 0
+    write /sys/devices/system/cpu/cpu3/online 0
+    # Use userspace governor to set min=max=787MHz
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "userspace"
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed 787200
+
+# dhcp daemon for bt tethering
+service dhcpcd_bt-pan /system/bin/dhcpcd -BKLG
+    disabled
+    oneshot
+
+service iprenew_bt-pan /system/bin/dhcpcd -n
+    disabled
+    oneshot
+
+# virtual sdcard daemon running as media_rw (1023)
+service sdcard /system/bin/sdcard -u 1023 -g 1023 -l /data/media /mnt/shell/emulated
+    class late_start
+
+# battery daemon to save/restore learned parameters
+service batteryd /system/bin/batteryd
+    class late_start
+    user system
+    group system
+
+    # tilt detection - see device/lge/dory/trig for tool details
+service tilt_detect /system/bin/trig single_axis 0x02000200 500000
+    class late_start
+    user system
+    group system
+    oneshot
+
+service tilt_detect_stop /system/bin/trig enable_int 0
+    class late_start
+    disabled
+    oneshot
+
+on property:persist.sys.disable_tilt_detect=1
+    start tilt_detect_stop
+
+on property:persist.sys.disable_tilt_detect=0
+    start tilt_detect
+
+# bugreport is triggered by holding down volume down, volume up and power
+service bugreport /system/bin/dumpstate -d -p -B \
+        -o /data/data/com.android.shell/files/bugreports/bugreport
+    class main
+    disabled
+    oneshot
+    keycodes 114 115 116
+
+service clockwork_proxy /system/bin/ClockworkProxy
+    class main
