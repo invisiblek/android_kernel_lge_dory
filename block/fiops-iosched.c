@@ -31,7 +31,7 @@ struct fiops_rb_root {
 };
 #define FIOPS_RB_ROOT	(struct fiops_rb_root) { .rb = RB_ROOT}
 
-enum wl_prio_t {
+enum wl_class_t {
 	IDLE_WORKLOAD = 0,
 	BE_WORKLOAD = 1,
 	RT_WORKLOAD = 2,
@@ -70,7 +70,7 @@ struct fiops_ioc {
 
 	pid_t pid;
 	unsigned short ioprio;
-	enum wl_prio_t wl_type;
+	enum wl_class_t wl_type;
 };
 
 #define ioc_service_tree(ioc) (&((ioc)->fiopsd->service_tree[(ioc)->wl_type]))
@@ -99,7 +99,7 @@ FIOPS_IOC_FNS(on_rr);
 FIOPS_IOC_FNS(prio_changed);
 #undef FIOPS_IOC_FNS
 
-enum wl_prio_t fiops_wl_type(short prio_class)
+enum wl_class_t fiops_wl_type(short prio_class)
 {
 	if (prio_class == IOPRIO_CLASS_RT)
 		return RT_WORKLOAD;
@@ -205,8 +205,6 @@ static void fiops_service_tree_add(struct fiops_data *fiopsd,
 	ioc->service_tree = service_tree;
 	p = &service_tree->rb.rb_node;
 	while (*p) {
-		struct rb_node **n;
-
 		parent = *p;
 		__ioc = rb_entry(parent, struct fiops_ioc, rb_node);
 
@@ -214,13 +212,11 @@ static void fiops_service_tree_add(struct fiops_data *fiopsd,
 		 * sort by key, that represents service time.
 		 */
 		if (vios <  __ioc->vios)
-			n = &(*p)->rb_left;
+			p = &parent->rb_left;
 		else {
-			n = &(*p)->rb_right;
+			p = &parent->rb_right;
 			left = 0;
 		}
-
-		p = n;
 	}
 
 	if (left)
@@ -453,11 +449,11 @@ static void fiops_init_prio_data(struct fiops_ioc *cic)
 		cic->wl_type = fiops_wl_type(task_nice_ioclass(tsk));
 		break;
 	case IOPRIO_CLASS_RT:
-		cic->ioprio = task_ioprio(ioc);
+		cic->ioprio = IOPRIO_PRIO_DATA(ioc->ioprio);
 		cic->wl_type = fiops_wl_type(IOPRIO_CLASS_RT);
 		break;
 	case IOPRIO_CLASS_BE:
-		cic->ioprio = task_ioprio(ioc);
+		cic->ioprio = IOPRIO_PRIO_DATA(ioc->ioprio);
 		cic->wl_type = fiops_wl_type(IOPRIO_CLASS_BE);
 		break;
 	case IOPRIO_CLASS_IDLE:
@@ -510,11 +506,8 @@ fiops_find_rq_fmerge(struct fiops_data *fiopsd, struct bio *bio)
 
 	cic = fiops_cic_lookup(fiopsd, tsk->io_context);
 
-	if (cic) {
-		sector_t sector = bio->bi_sector + bio_sectors(bio);
-
-		return elv_rb_find(&cic->sort_list, sector);
-	}
+	if (cic)
+		return elv_rb_find(&cic->sort_list, bio_end_sector(bio));
 
 	return NULL;
 }
@@ -597,14 +590,22 @@ static void fiops_kick_queue(struct work_struct *work)
 	spin_unlock_irq(q->queue_lock);
 }
 
-static void *fiops_init_queue(struct request_queue *q)
+static int fiops_init_queue(struct request_queue *q, struct elevator_type *e)
 {
 	struct fiops_data *fiopsd;
+	struct elevator_queue *eq;
 	int i;
 
+	eq = elevator_alloc(q, e);
+	if (!eq)
+		return -ENOMEM;
+
 	fiopsd = kzalloc_node(sizeof(*fiopsd), GFP_KERNEL, q->node);
-	if (!fiopsd)
-		return NULL;
+	if (!fiopsd) {
+		kobject_put(&eq->kobj);
+		return -ENOMEM;
+	}
+	eq->elevator_data = fiopsd;
 
 	fiopsd->queue = q;
 
@@ -618,7 +619,10 @@ static void *fiops_init_queue(struct request_queue *q)
 	fiopsd->sync_scale = VIOS_SYNC_SCALE;
 	fiopsd->async_scale = VIOS_ASYNC_SCALE;
 
-	return fiopsd;
+	spin_lock_irq(q->queue_lock);
+	q->elevator = eq;
+	spin_unlock_irq(q->queue_lock);
+	return 0;
 }
 
 static void fiops_init_icq(struct io_cq *icq)
