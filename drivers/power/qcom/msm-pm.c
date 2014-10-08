@@ -20,6 +20,7 @@
 #include <linux/io.h>
 #include <linux/ktime.h>
 #include <linux/smp.h>
+#include <linux/sched.h>
 #include <linux/tick.h>
 #include <linux/delay.h>
 #include <linux/platform_device.h>
@@ -38,6 +39,7 @@
 #ifdef CONFIG_VFP
 #include <asm/vfp.h>
 #endif
+#include <asm/uaccess.h>
 #include <soc/qcom/jtag.h>
 #include "idle.h"
 #include "pm-boot.h"
