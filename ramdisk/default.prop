@@ -1,12 +1,12 @@
 #
 # ADDITIONAL_DEFAULT_PROPERTIES
 #
-ro.secure=1
+ro.secure=0
 ro.allow.mock.location=0
-ro.debuggable=0
+ro.debuggable=1
 ro.bt.bdaddr_path=/persist/bdaddr.txt
-ro.adb.secure=1
+ro.adb.secure=0
 persist.adb.notify=0
 bluetooth.force_pm_timer=2000
-persist.sys.usb.config=none
+persist.sys.usb.config=adb
 androidboot.selinux=0
