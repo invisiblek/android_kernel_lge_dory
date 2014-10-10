@@ -116,8 +116,9 @@ service iprenew_bt-pan /system/bin/dhcpcd -n
     oneshot
 
 # virtual sdcard daemon running as media_rw (1023)
-service sdcard /system/bin/sdcard -u 1023 -g 1023 -l /data/media /mnt/shell/emulated
+service sdcard /res/busybox mount -t sdcardfs -o rw,nosuid,nodev,noatime,nodiratime,uid=1023,gid=1023,wgid=1015,derive=legacy,reserved_mb=20 /data/media /mnt/shell/emulated
     class late_start
+    oneshot
 
 # battery daemon to save/restore learned parameters
 service batteryd /system/bin/batteryd
