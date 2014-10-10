@@ -47,7 +47,7 @@
 	vibrator {
 		motor-pwm-gpio = <&msmgpio 34 0x00>;
 		motor-pwm-func = <3>;
-		motor-amp = <80>;
+		motor-amp = <100>;
 	};
 };
 
