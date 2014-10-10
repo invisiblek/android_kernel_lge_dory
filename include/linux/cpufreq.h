@@ -273,18 +273,6 @@ static inline void cpufreq_verify_within_limits(struct cpufreq_policy *policy,
 	return;
 }
 
-#ifdef CONFIG_CPU_FREQ
-void cpufreq_suspend(void);
-void cpufreq_resume(void);
-#else
-static inline void cpufreq_suspend(void) {}
-static inline void cpufreq_resume(void) {}
-#endif
-
-/*********************************************************************
- *                     CPUFREQ NOTIFIER INTERFACE                    *
- *********************************************************************/
-
 static inline void
 cpufreq_verify_within_cpu_limits(struct cpufreq_policy *policy)
 {
@@ -313,8 +301,6 @@ cpufreq_verify_within_cpu_limits(struct cpufreq_policy *policy)
 #define CPUFREQ_UPDATE_POLICY_CPU	(4)
 #define CPUFREQ_CREATE_POLICY		(5)
 #define CPUFREQ_REMOVE_POLICY		(6)
-
-u64 get_cpu_idle_time(unsigned int cpu, u64 *wall, int io_busy);
 
 #ifdef CONFIG_CPU_FREQ
 int cpufreq_register_notifier(struct notifier_block *nb, unsigned int list);

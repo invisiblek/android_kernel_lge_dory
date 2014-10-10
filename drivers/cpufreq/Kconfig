@@ -167,7 +167,6 @@ config CPU_FREQ_GOV_ONDEMAND
 
 config CPU_FREQ_GOV_INTERACTIVE
 	tristate "'interactive' cpufreq policy governor"
-	default n
 	help
 	  'interactive' - This driver adds a dynamic cpufreq policy governor
 	  designed for latency-sensitive workloads.
@@ -234,7 +233,7 @@ source "drivers/cpufreq/Kconfig.x86"
 endmenu
 
 menu "ARM CPU frequency scaling drivers"
-depends on ARM || ARM64
+depends on ARM
 source "drivers/cpufreq/Kconfig.arm"
 endmenu
 

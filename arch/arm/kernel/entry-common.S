@@ -389,7 +389,9 @@ ENTRY(vector_swi)
 #else
  USER(	ldr	r10, [lr, #-4]		)	@ get SWI instruction
 #endif
- ARM_BE8(rev	r10, r10)			@ little endian instruction
+#ifdef CONFIG_CPU_ENDIAN_BE8
+	rev	r10, r10			@ little endian instruction
+#endif
 
 #elif defined(CONFIG_AEABI)
 

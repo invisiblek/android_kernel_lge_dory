@@ -31,8 +31,6 @@
 #define GIC_DIST_TARGET			0x800
 #define GIC_DIST_CONFIG			0xc00
 #define GIC_DIST_SOFTINT		0xf00
-#define GIC_DIST_SGI_PENDING_CLEAR	0xf10
-#define GIC_DIST_SGI_PENDING_SET	0xf20
 
 #define GICH_HCR			0x0
 #define GICH_VTR			0x4
@@ -75,7 +73,6 @@ void gic_set_irq_secure(unsigned int irq);
 #else
 static inline void gic_set_irq_secure(unsigned int irq) { }
 #endif
-void gic_cpu_if_down(void);
 static inline void gic_init(unsigned int nr, int start,
 			    void __iomem *dist , void __iomem *cpu)
 {
@@ -84,11 +81,6 @@ static inline void gic_init(unsigned int nr, int start,
 
 bool gic_is_spi_pending(unsigned int irq);
 void gic_clear_spi_pending(unsigned int irq);
-
-void gic_send_sgi(unsigned int cpu_id, unsigned int irq);
-int gic_get_cpu_id(unsigned int cpu);
-void gic_migrate_target(unsigned int new_cpu_id);
-unsigned long gic_get_sgir_physaddr(void);
 
 #endif /* __ASSEMBLY */
 #endif

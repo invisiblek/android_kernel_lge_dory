@@ -35,7 +35,6 @@
 #include <asm/unwind.h>
 #include <asm/tls.h>
 #include <asm/system_misc.h>
-#include <asm/opcodes.h>
 
 #include <trace/events/exception.h>
 
@@ -351,17 +350,15 @@ void arm_notify_die(const char *str, struct pt_regs *regs,
 int is_valid_bugaddr(unsigned long pc)
 {
 #ifdef CONFIG_THUMB2_KERNEL
-	u16 bkpt;
-	u16 insn = __opcode_to_mem_thumb16(BUG_INSTR_VALUE);
+	unsigned short bkpt;
 #else
-	u32 bkpt;
-	u32 insn = __opcode_to_mem_arm(BUG_INSTR_VALUE);
+	unsigned long bkpt;
 #endif
 
 	if (probe_kernel_address((unsigned *)pc, bkpt))
 		return 0;
 
-	return bkpt == insn;
+	return bkpt == BUG_INSTR_VALUE;
 }
 
 #endif
@@ -414,28 +411,25 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
 	if (processor_mode(regs) == SVC_MODE) {
 #ifdef CONFIG_THUMB2_KERNEL
 		if (thumb_mode(regs)) {
-			instr = __mem_to_opcode_thumb16(((u16 *)pc)[0]);
+			instr = ((u16 *)pc)[0];
 			if (is_wide_instruction(instr)) {
-				u16 inst2;
-				inst2 = __mem_to_opcode_thumb16(((u16 *)pc)[1]);
-				instr = __opcode_thumb32_compose(instr, inst2);
+				instr <<= 16;
+				instr |= ((u16 *)pc)[1];
 			}
 		} else
 #endif
-			instr = __mem_to_opcode_arm(*(u32 *) pc);
+			instr = *(u32 *) pc;
 	} else if (thumb_mode(regs)) {
 		if (get_user(instr, (u16 __user *)pc))
 			goto die_sig;
-		instr = __mem_to_opcode_thumb16(instr);
 		if (is_wide_instruction(instr)) {
 			unsigned int instr2;
 			if (get_user(instr2, (u16 __user *)pc+1))
 				goto die_sig;
-			instr2 = __mem_to_opcode_thumb16(instr2);
-			instr = __opcode_thumb32_compose(instr, instr2);
+			instr <<= 16;
+			instr |= instr2;
 		}
 	} else if (get_user(instr, (u32 __user *)pc)) {
-		instr = __mem_to_opcode_arm(instr);
 		goto die_sig;
 	}
 

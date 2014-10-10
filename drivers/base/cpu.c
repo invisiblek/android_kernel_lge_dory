@@ -13,8 +13,6 @@
 #include <linux/gfp.h>
 #include <linux/slab.h>
 #include <linux/percpu.h>
-#include <linux/acpi.h>
-#include <linux/of.h>
 #include <linux/cpufeature.h>
 
 #include "base.h"

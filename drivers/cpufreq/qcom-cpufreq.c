@@ -63,12 +63,12 @@ struct cpufreq_work_struct {
 static DEFINE_PER_CPU(struct cpufreq_work_struct, cpufreq_work);
 static struct workqueue_struct *msm_cpufreq_wq;
 
-struct cpufreq_suspend_qcom_t {
+struct cpufreq_suspend_t {
 	struct mutex suspend_mutex;
 	int device_suspended;
 };
 
-static DEFINE_PER_CPU(struct cpufreq_suspend_qcom_t, cpufreq_suspend_qcom);
+static DEFINE_PER_CPU(struct cpufreq_suspend_t, cpufreq_suspend);
 
 unsigned long msm_cpufreq_get_bw(void)
 {
@@ -172,9 +172,9 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 
 	struct cpufreq_work_struct *cpu_work = NULL;
 
-	mutex_lock(&per_cpu(cpufreq_suspend_qcom, policy->cpu).suspend_mutex);
+	mutex_lock(&per_cpu(cpufreq_suspend, policy->cpu).suspend_mutex);
 
-	if (per_cpu(cpufreq_suspend_qcom, policy->cpu).device_suspended) {
+	if (per_cpu(cpufreq_suspend, policy->cpu).device_suspended) {
 		pr_debug("cpufreq: cpu%d scheduling frequency change "
 				"in suspend.\n", policy->cpu);
 		ret = -EFAULT;
@@ -207,7 +207,7 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 	ret = cpu_work->status;
 
 done:
-	mutex_unlock(&per_cpu(cpufreq_suspend_qcom, policy->cpu).suspend_mutex);
+	mutex_unlock(&per_cpu(cpufreq_suspend, policy->cpu).suspend_mutex);
 	return ret;
 }
 
@@ -300,15 +300,15 @@ static int msm_cpufreq_cpu_callback(struct notifier_block *nfb,
 
 	switch (action & ~CPU_TASKS_FROZEN) {
 	case CPU_ONLINE:
-		per_cpu(cpufreq_suspend_qcom, cpu).device_suspended = 0;
+		per_cpu(cpufreq_suspend, cpu).device_suspended = 0;
 		break;
 	case CPU_DOWN_PREPARE:
-		mutex_lock(&per_cpu(cpufreq_suspend_qcom, cpu).suspend_mutex);
-		per_cpu(cpufreq_suspend_qcom, cpu).device_suspended = 1;
-		mutex_unlock(&per_cpu(cpufreq_suspend_qcom, cpu).suspend_mutex);
+		mutex_lock(&per_cpu(cpufreq_suspend, cpu).suspend_mutex);
+		per_cpu(cpufreq_suspend, cpu).device_suspended = 1;
+		mutex_unlock(&per_cpu(cpufreq_suspend, cpu).suspend_mutex);
 		break;
 	case CPU_DOWN_FAILED:
-		per_cpu(cpufreq_suspend_qcom, cpu).device_suspended = 0;
+		per_cpu(cpufreq_suspend, cpu).device_suspended = 0;
 		break;
 	/*
 	 * Scale down clock/power of CPU that is dead and scale it back up
@@ -342,14 +342,14 @@ static struct notifier_block __refdata msm_cpufreq_cpu_notifier = {
 	.notifier_call = msm_cpufreq_cpu_callback,
 };
 
-static int msm_cpufreq_suspend_qcom(void)
+static int msm_cpufreq_suspend(void)
 {
 	int cpu;
 
 	for_each_possible_cpu(cpu) {
-		mutex_lock(&per_cpu(cpufreq_suspend_qcom, cpu).suspend_mutex);
-		per_cpu(cpufreq_suspend_qcom, cpu).device_suspended = 1;
-		mutex_unlock(&per_cpu(cpufreq_suspend_qcom, cpu).suspend_mutex);
+		mutex_lock(&per_cpu(cpufreq_suspend, cpu).suspend_mutex);
+		per_cpu(cpufreq_suspend, cpu).device_suspended = 1;
+		mutex_unlock(&per_cpu(cpufreq_suspend, cpu).suspend_mutex);
 	}
 
 	return NOTIFY_DONE;
@@ -360,7 +360,7 @@ static int msm_cpufreq_resume(void)
 	int cpu;
 
 	for_each_possible_cpu(cpu) {
-		per_cpu(cpufreq_suspend_qcom, cpu).device_suspended = 0;
+		per_cpu(cpufreq_suspend, cpu).device_suspended = 0;
 	}
 
 	return NOTIFY_DONE;
@@ -375,7 +375,7 @@ static int msm_cpufreq_pm_event(struct notifier_block *this,
 		return msm_cpufreq_resume();
 	case PM_HIBERNATION_PREPARE:
 	case PM_SUSPEND_PREPARE:
-		return msm_cpufreq_suspend_qcom();
+		return msm_cpufreq_suspend();
 	default:
 		return NOTIFY_DONE;
 	}
@@ -594,8 +594,8 @@ static int __init msm_cpufreq_register(void)
 	int cpu, rc;
 
 	for_each_possible_cpu(cpu) {
-		mutex_init(&(per_cpu(cpufreq_suspend_qcom, cpu).suspend_mutex));
-		per_cpu(cpufreq_suspend_qcom, cpu).device_suspended = 0;
+		mutex_init(&(per_cpu(cpufreq_suspend, cpu).suspend_mutex));
+		per_cpu(cpufreq_suspend, cpu).device_suspended = 0;
 	}
 
 	rc = platform_driver_probe(&msm_cpufreq_plat_driver,
@@ -604,7 +604,7 @@ static int __init msm_cpufreq_register(void)
 		/* Unblock hotplug if msm-cpufreq probe fails */
 		unregister_hotcpu_notifier(&msm_cpufreq_cpu_notifier);
 		for_each_possible_cpu(cpu)
-			mutex_destroy(&(per_cpu(cpufreq_suspend_qcom, cpu).
+			mutex_destroy(&(per_cpu(cpufreq_suspend, cpu).
 					suspend_mutex));
 		return rc;
 	}
