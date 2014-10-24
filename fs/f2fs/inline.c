@@ -355,8 +355,6 @@ static int f2fs_convert_inline_dir(struct inode *dir, struct page *ipage,
 	/* copy data from inline dentry block to new dentry block */
 	memcpy(dentry_blk->dentry_bitmap, inline_dentry->dentry_bitmap,
 					INLINE_DENTRY_BITMAP_SIZE);
-	memcpy(dentry_blk->reserved, inline_dentry->reserved,
-					INLINE_RESERVED_SIZE);
 	memcpy(dentry_blk->dentry, inline_dentry->dentry,
 			sizeof(struct f2fs_dir_entry) * NR_INLINE_DENTRY);
 	memcpy(dentry_blk->filename, inline_dentry->filename,

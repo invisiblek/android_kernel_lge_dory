@@ -1049,7 +1049,7 @@ static inline int f2fs_test_bit(unsigned int nr, char *addr)
 	return mask & *addr;
 }
 
-static inline int f2fs_set_bit(unsigned int nr, char *addr)
+static inline int f2fs_test_and_set_bit(unsigned int nr, char *addr)
 {
 	int mask;
 	int ret;
@@ -1061,7 +1061,7 @@ static inline int f2fs_set_bit(unsigned int nr, char *addr)
 	return ret;
 }
 
-static inline int f2fs_clear_bit(unsigned int nr, char *addr)
+static inline int f2fs_test_and_clear_bit(unsigned int nr, char *addr)
 {
 	int mask;
 	int ret;
@@ -1071,6 +1071,15 @@ static inline int f2fs_clear_bit(unsigned int nr, char *addr)
 	ret = mask & *addr;
 	*addr &= ~mask;
 	return ret;
+}
+
+static inline void f2fs_change_bit(unsigned int nr, char *addr)
+{
+	int mask;
+
+	addr += (nr >> 3);
+	mask = 1 << (7 - (nr & 0x07));
+	*addr ^= mask;
 }
 
 /* used for f2fs_inode_info->flags */
@@ -1115,15 +1124,6 @@ static inline void set_acl_inode(struct f2fs_inode_info *fi, umode_t mode)
 {
 	fi->i_acl_mode = mode;
 	set_inode_flag(fi, FI_ACL_MODE);
-}
-
-static inline int cond_clear_inode_flag(struct f2fs_inode_info *fi, int flag)
-{
-	if (is_inode_flag_set(fi, FI_ACL_MODE)) {
-		clear_inode_flag(fi, FI_ACL_MODE);
-		return 1;
-	}
-	return 0;
 }
 
 static inline void get_inline_info(struct f2fs_inode_info *fi,
