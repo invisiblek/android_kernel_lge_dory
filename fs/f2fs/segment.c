@@ -564,7 +564,7 @@ static void add_discard_addrs(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 
 	/* SIT_VBLOCK_MAP_SIZE should be multiple of sizeof(unsigned long) */
 	for (i = 0; i < entries; i++)
-		dmap[i] = (cur_map[i] ^ ckpt_map[i]) & ckpt_map[i];
+		dmap[i] = ~(cur_map[i] | ckpt_map[i]);
 
 	while (force || SM_I(sbi)->nr_discards <= SM_I(sbi)->max_discards) {
 		start = __find_rev_next_bit(dmap, max_blocks, end + 1);
@@ -1093,7 +1093,9 @@ int f2fs_trim_fs(struct f2fs_sb_info *sbi, struct fstrim_range *range)
 	cpc.trim_minlen = range->minlen >> sbi->log_blocksize;
 
 	/* do checkpoint to issue discard commands safely */
+	mutex_lock(&sbi->gc_mutex);
 	write_checkpoint(sbi, &cpc);
+	mutex_unlock(&sbi->gc_mutex);
 out:
 	range->len = cpc.trimmed << sbi->log_blocksize;
 	return 0;
