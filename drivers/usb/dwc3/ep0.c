@@ -484,7 +484,7 @@ static int dwc3_ep0_handle_feature(struct dwc3 *dwc,
 			if (!set && (dep->flags & DWC3_EP_WEDGE))
 				return 0;
 
-			ret = __dwc3_gadget_ep_set_halt(dep, set);
+			ret = __dwc3_gadget_ep_set_halt(dep, set, true);
 			if (ret)
 				return -EINVAL;
 			break;
