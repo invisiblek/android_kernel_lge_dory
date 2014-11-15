@@ -40,6 +40,8 @@
 #include <linux/mutex.h>
 #include <asm/arch_timer.h>
 
+static DEFINE_MUTEX(enable_xo_mutex);
+
 enum {
 	MSM_MPM_GIC_IRQ_DOMAIN,
 	MSM_MPM_GPIO_IRQ_DOMAIN,
@@ -587,8 +589,6 @@ void msm_mpm_exit_sleep(bool from_idle)
 }
 static void msm_mpm_sys_low_power_modes(bool allow)
 {
-	static DEFINE_MUTEX(enable_xo_mutex);
-
 	mutex_lock(&enable_xo_mutex);
 	if (allow) {
 		if (xo_enabled) {
