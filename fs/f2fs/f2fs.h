@@ -499,6 +499,14 @@ struct f2fs_bio_info {
 	struct rw_semaphore io_rwsem;	/* blocking op for bio */
 };
 
+/* for inner inode cache management */
+struct inode_management {
+	struct radix_tree_root ino_root;	/* ino entry array */
+	spinlock_t ino_lock;			/* for ino entry lock */
+	struct list_head ino_list;		/* inode list head */
+	unsigned long ino_num;			/* number of entries */
+};
+
 struct f2fs_sb_info {
 	struct super_block *sb;			/* pointer to VFS super block */
 	struct proc_dir_entry *s_proc;		/* proc entry */
@@ -528,11 +536,7 @@ struct f2fs_sb_info {
 	bool por_doing;				/* recovery is doing or not */
 	wait_queue_head_t cp_wait;
 
-	/* for inode management */
-	struct radix_tree_root ino_root[MAX_INO_ENTRY];	/* ino entry array */
-	spinlock_t ino_lock[MAX_INO_ENTRY];		/* for ino entry lock */
-	struct list_head ino_list[MAX_INO_ENTRY];	/* inode list head */
-	unsigned long ino_num[MAX_INO_ENTRY];		/* number of entries */
+	struct inode_management im[MAX_INO_ENTRY];      /* manage inode cache */
 
 	/* for orphan inode, use 0'th array */
 	unsigned int max_orphans;		/* max orphan inodes */
@@ -1288,7 +1292,7 @@ struct dentry *f2fs_get_parent(struct dentry *child);
 extern unsigned char f2fs_filetype_table[F2FS_FT_MAX];
 void set_de_type(struct f2fs_dir_entry *, struct inode *);
 struct f2fs_dir_entry *find_target_dentry(struct qstr *, int *,
-			struct f2fs_dentry_ptr *, unsigned int flags);
+			struct f2fs_dentry_ptr *);
 bool f2fs_fill_dentries(struct file *, void *, filldir_t,
 			struct f2fs_dentry_ptr *, unsigned int, unsigned int);
 void do_make_empty_dir(struct inode *, struct inode *,
@@ -1299,7 +1303,7 @@ void update_parent_metadata(struct inode *, struct inode *, unsigned int);
 int room_for_filename(const void *, int, int);
 void f2fs_drop_nlink(struct inode *, struct inode *, struct page *);
 struct f2fs_dir_entry *f2fs_find_entry(struct inode *, struct qstr *,
-					struct page **, unsigned int flags);
+							struct page **);
 struct f2fs_dir_entry *f2fs_parent_dir(struct inode *, struct page **);
 ino_t f2fs_inode_by_name(struct inode *, struct qstr *);
 void f2fs_set_link(struct inode *, struct f2fs_dir_entry *,
@@ -1614,7 +1618,7 @@ int f2fs_write_inline_data(struct inode *, struct page *);
 void truncate_inline_data(struct page *, u64);
 bool recover_inline_data(struct inode *, struct page *);
 struct f2fs_dir_entry *find_in_inline_dir(struct inode *, struct qstr *,
-					struct page **, unsigned int flags);
+							struct page **);
 struct f2fs_dir_entry *f2fs_parent_inline_dir(struct inode *, struct page **);
 int make_empty_inline_dir(struct inode *inode, struct inode *, struct page *);
 int f2fs_add_inline_entry(struct inode *, const struct qstr *, struct inode *);
