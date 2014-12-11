@@ -20,6 +20,9 @@ on init
     setprop ro.boot.selinux 0
 
 on post-fs-data
+    # Update touch firmware if required
+    write /sys/bus/i2c/devices/5-0020/check_fw 1
+
     mkdir /data/media 0770 media_rw media_rw
     mkdir /data/misc/batteryd 0700 system system
 
@@ -54,6 +57,8 @@ on post-fs-data
 on boot
     mount debugfs /sys/kernel/debug /sys/kernel/debug
     chown system system /sys/kernel/debug/kgsl/proc
+    chown system system /sys/class/graphics/fb0/idle_mode
+    chown system system /sys/bus/i2c/devices/5-0020/idle_mode
 
     setprop ro.radio.noril yes
 
@@ -84,6 +89,9 @@ on boot
 
     # adsp subsystem restart
     write /sys/bus/msm_subsys/devices/subsys0/restart_level "related"
+
+    # disable network time update
+    setprop config.disable_networktime true
 
 on fs
     mount_all /fstab.dory
@@ -125,24 +133,6 @@ service batteryd /system/bin/batteryd
     class late_start
     user system
     group system
-
-    # tilt detection - see device/lge/dory/trig for tool details
-service tilt_detect /system/bin/trig single_axis 0x02000200 500000
-    class late_start
-    user system
-    group system
-    oneshot
-
-service tilt_detect_stop /system/bin/trig enable_int 0
-    class late_start
-    disabled
-    oneshot
-
-on property:persist.sys.disable_tilt_detect=1
-    start tilt_detect_stop
-
-on property:persist.sys.disable_tilt_detect=0
-    start tilt_detect
 
 # bugreport is triggered by holding down volume down, volume up and power
 service bugreport /system/bin/dumpstate -d -p -B \
