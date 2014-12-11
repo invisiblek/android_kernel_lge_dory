@@ -98,11 +98,7 @@ obj-$(CONFIG_LATENCYTOP) += latencytop.o
 obj-$(CONFIG_BINFMT_ELF) += elfcore.o
 obj-$(CONFIG_COMPAT_BINFMT_ELF) += elfcore.o
 obj-$(CONFIG_BINFMT_ELF_FDPIC) += elfcore.o
-obj-$(CONFIG_FUNCTION_TRACER) += trace/
-obj-$(CONFIG_TRACING) += trace/
-obj-$(CONFIG_TRACE_CLOCK) += trace/
-obj-$(CONFIG_RING_BUFFER) += trace/
-obj-$(CONFIG_TRACEPOINTS) += trace/
+obj-y += trace/
 obj-$(CONFIG_IRQ_WORK) += irq_work.o
 obj-$(CONFIG_CPU_PM) += cpu_pm.o
 
