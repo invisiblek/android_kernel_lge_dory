@@ -465,11 +465,33 @@ static int mdss_dsi_ulps_config_sub(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 		return -ENOTSUPP;
 	}
 
-	if (enable && !ctrl_pdata->ulps) {
+	mutex_lock(&ctrl_pdata->ulps_lock);
+
+	/*
+	 * ulps_ref_count: holds ulps states supporting nested ulps control
+	 * (initial: 1 -> ulps disabled)
+	 * 0: ulps enabled...
+	 * >= 1: ulps disabled
+	 */
+
+	if (enable && ctrl_pdata->ulps_ref_count < 1) {
+		pr_err("%s: Try to enable ulps which has not been disabled"
+			"count = %d\n", __func__, ctrl_pdata->ulps_ref_count);
+		mutex_unlock(&ctrl_pdata->ulps_lock);
+		return -EINVAL;
+	}
+
+	if (enable)
+		ctrl_pdata->ulps_ref_count--;
+	else
+		ctrl_pdata->ulps_ref_count++;
+
+	if (enable && ctrl_pdata->ulps_ref_count == 0) {
 		/* No need to configure ULPS mode when entering suspend state */
 		if (!pdata->panel_info.panel_power_on) {
-			pr_err("%s: panel off. returning\n", __func__);
-			goto error;
+			pr_warn("%s: panel off. returning\n", __func__);
+			mutex_unlock(&ctrl_pdata->ulps_lock);
+			return 0;
 		}
 
 		if (__mdss_dsi_clk_enabled(ctrl_pdata, DSI_LINK_CLKS)) {
@@ -527,7 +549,7 @@ static int mdss_dsi_ulps_config_sub(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 
 		mdss_dsi_clk_ctrl(ctrl_pdata, DSI_BUS_CLKS, 0);
 		ctrl_pdata->ulps = true;
-	} else if (ctrl_pdata->ulps) {
+	} else if (!enable && ctrl_pdata->ulps_ref_count == 1) {
 		ret = mdss_dsi_clk_ctrl(ctrl_pdata, DSI_BUS_CLKS, 1);
 		if (ret) {
 			pr_err("%s: Failed to enable bus clocks. rc=%d\n",
@@ -589,7 +611,17 @@ static int mdss_dsi_ulps_config_sub(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 	pr_debug("%s: DSI lane status = 0x%08x. Ulps %s\n", __func__,
 		lane_status, enable ? "enabled" : "disabled");
 
+	mutex_unlock(&ctrl_pdata->ulps_lock);
+	return 0;
+
 error:
+	if (enable)
+		ctrl_pdata->ulps_ref_count++;
+	else
+		ctrl_pdata->ulps_ref_count--;
+
+	mutex_unlock(&ctrl_pdata->ulps_lock);
+
 	return ret;
 }
 
@@ -650,13 +682,15 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	pinfo = &pdata->panel_info;
 	mipi = &pdata->panel_info.mipi;
 
+	mutex_lock(&ctrl_pdata->ulps_lock);
+
 	ret = mdss_dsi_panel_power_on(pdata, 1);
 	if (ret) {
 		pr_err("%s:Panel power on failed. rc=%d\n", __func__, ret);
-		return ret;
+		goto exit;
 	}
 
-	mdss_dsi_clk_ctrl(ctrl_pdata, DSI_BUS_CLKS, 1);
+	ret = mdss_dsi_clk_ctrl(ctrl_pdata, DSI_BUS_CLKS, 1);
 	if (ret) {
 		pr_err("%s: failed to enable bus clocks. rc=%d\n", __func__,
 			ret);
@@ -664,10 +698,10 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 		if (ret) {
 			pr_err("%s: Panel reset failed. rc=%d\n",
 					__func__, ret);
-			return ret;
+			goto exit;
 		}
 		pdata->panel_info.panel_power_on = 0;
-		return ret;
+		goto exit;
 	}
 	pdata->panel_info.panel_power_on = 1;
 
@@ -703,8 +737,11 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	if (pdata->panel_info.type == MIPI_CMD_PANEL)
 		mdss_dsi_clk_ctrl(ctrl_pdata, DSI_ALL_CLKS, 0);
 
+exit:
+	mutex_unlock(&ctrl_pdata->ulps_lock);
+
 	pr_debug("%s-:\n", __func__);
-	return 0;
+	return ret;
 }
 
 static int mdss_dsi_pinctrl_set_state(
@@ -1182,23 +1219,6 @@ end:
 	return dsi_pan_node;
 }
 
-static ssize_t mdss_dsi_idle_mode_store(struct device *dev,
-				struct device_attribute *attr,
-				const char *buf, size_t count)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct mdss_dsi_ctrl_pdata *ctrl_pdata = platform_get_drvdata(pdev);
-	int ret, enable;
-
-	ret = sscanf(buf, "%d", &enable);
-	if (ret != 1)
-		return -EINVAL;
-
-	mdss_dsi_panel_idle_mode(ctrl_pdata, enable);
-	return count;
-}
-DEVICE_ATTR(idle_mode, 0200, NULL, mdss_dsi_idle_mode_store);
-
 static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 {
 	int rc = 0;
@@ -1293,29 +1313,24 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 
 	cmd_cfg_cont_splash = mdss_panel_get_boot_cfg() ? true : false;
 
+	mutex_init(&ctrl_pdata->ulps_lock);
+	ctrl_pdata->ulps_ref_count = 1;	/* default: 1 -> ulps disable */
+
 	rc = mdss_dsi_panel_init(dsi_pan_node, ctrl_pdata, cmd_cfg_cont_splash);
 	if (rc) {
 		pr_err("%s: dsi panel init failed\n", __func__);
 		goto error_pan_node;
 	}
 
-	rc = device_create_file(&pdev->dev, &dev_attr_idle_mode);
-	if (rc) {
-		pr_err("%s: failed to create idle mode attr\n", __func__);
-		goto error_pan_node;
-	}
-
 	rc = dsi_panel_device_register(dsi_pan_node, ctrl_pdata);
 	if (rc) {
 		pr_err("%s: dsi panel dev reg failed\n", __func__);
-		goto error_register;
+		goto error_pan_node;
 	}
 
 	pr_debug("%s: Dsi Ctrl->%d initialized\n", __func__, index);
 	return 0;
 
-error_register:
-	device_remove_file(&pdev->dev, &dev_attr_idle_mode);
 error_pan_node:
 	of_node_put(dsi_pan_node);
 error_vreg:
@@ -1340,7 +1355,6 @@ static int mdss_dsi_ctrl_remove(struct platform_device *pdev)
 			ctrl_pdata->power_data.vreg_config,
 			ctrl_pdata->power_data.num_vreg, 1) < 0)
 		pr_err("%s: failed to de-init vregs\n", __func__);
-	device_remove_file(&pdev->dev, &dev_attr_idle_mode);
 	mdss_dsi_put_dt_vreg_data(&pdev->dev, &ctrl_pdata->power_data);
 	mfd = platform_get_drvdata(pdev);
 	msm_dss_iounmap(&ctrl_pdata->mmss_misc_io);

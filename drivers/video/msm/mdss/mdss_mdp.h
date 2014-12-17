@@ -20,6 +20,7 @@
 #include <linux/platform_device.h>
 #include <linux/notifier.h>
 #include <linux/irqreturn.h>
+#include <linux/kref.h>
 
 #include "mdss.h"
 #include "mdss_mdp_hwio.h"
@@ -368,7 +369,8 @@ struct mdss_mdp_pipe {
 	struct mdss_mdp_shared_reg_ctrl clk_status;
 	struct mdss_mdp_shared_reg_ctrl sw_reset;
 
-	atomic_t ref_cnt;
+	struct kref kref;
+
 	u32 play_cnt;
 	int pid;
 	bool is_handed_off;
@@ -409,8 +411,7 @@ struct mdss_mdp_pipe {
 	struct mdss_mdp_data back_buf;
 	struct mdss_mdp_data front_buf;
 
-	struct list_head used_list;
-	struct list_head cleanup_list;
+	struct list_head list;
 
 	struct mdp_overlay_pp_params pp_cfg;
 	struct mdss_pipe_pp_res pp_res;
@@ -436,6 +437,8 @@ struct mdss_overlay_private {
 	struct mutex ov_lock;
 	struct mdss_mdp_ctl *ctl;
 	struct mdss_mdp_wb *wb;
+
+	struct mutex list_lock;
 	struct list_head overlay_list;
 	struct list_head pipes_used;
 	struct list_head pipes_cleanup;

@@ -278,6 +278,7 @@ struct mdss_dsi_ctrl_pdata {
 	int bklt_max;
 	int new_fps;
 	int pwm_enabled;
+	int idle;
 	bool blanked;
 	struct pwm_device *pwm_bl;
 	struct dsi_drv_cm_data shared_pdata;
@@ -310,6 +311,8 @@ struct mdss_dsi_ctrl_pdata {
 	struct mutex suspend_mutex;
 
 	bool ulps;
+	struct mutex ulps_lock;
+	unsigned int ulps_ref_count;
 
 	struct dsi_buf tx_buf;
 	struct dsi_buf rx_buf;
@@ -373,7 +376,6 @@ int mdss_dsi_ulps_config(struct mdss_dsi_ctrl_pdata *ctrl, int enable);
 int mdss_dsi_panel_init(struct device_node *node,
 		struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 		bool cmd_cfg_cont_splash);
-void mdss_dsi_panel_idle_mode(struct mdss_dsi_ctrl_pdata *ctrl, int enable);
 void mdss_dsi_panel_low_fps_mode(struct mdss_dsi_ctrl_pdata *ctrl, int enable);
 
 static inline bool mdss_dsi_broadcast_mode_enabled(void)

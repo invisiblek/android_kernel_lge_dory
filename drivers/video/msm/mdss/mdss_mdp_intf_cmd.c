@@ -499,6 +499,21 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 				&ctx->pp_comp, KOFF_TIMEOUT);
 
 		if (rc <= 0) {
+			u32 status, mask;
+
+			mask = BIT(MDSS_MDP_IRQ_PING_PONG_COMP + ctx->pp_num);
+			status = mask & readl_relaxed(ctl->mdata->mdp_base +
+					MDSS_MDP_REG_INTR_STATUS);
+			writel_relaxed(mask, ctl->mdata->mdp_base +
+					MDSS_MDP_REG_INTR_CLEAR);
+
+			if (status || try_wait_for_completion(&ctx->pp_comp)) {
+				WARN(status, "pp done but irq not triggered\n");
+				rc = 1;
+			}
+		}
+
+		if (rc <= 0) {
 			WARN(1, "cmd kickoff timed out (%d) ctl=%d\n",
 						rc, ctl->num);
 			rc = -EPERM;
@@ -580,6 +595,7 @@ int mdss_mdp_cmd_kickoff(struct mdss_mdp_ctl *ctl, void *arg)
 int mdss_mdp_cmd_off_pan_on(struct mdss_mdp_ctl *ctl)
 {
 	struct mdss_mdp_cmd_ctx *ctx;
+	struct mdss_panel_info *pinfo;
 	unsigned long flags;
 	int need_wait = 0;
 
@@ -588,6 +604,8 @@ int mdss_mdp_cmd_off_pan_on(struct mdss_mdp_ctl *ctl)
 		pr_err("invalid ctx\n");
 		return -ENODEV;
 	}
+
+	pinfo = &ctl->panel_data->panel_info;
 
 	pr_debug("%s: clk_enabled=%d\n", __func__, ctx->clk_enabled);
 
@@ -599,7 +617,17 @@ int mdss_mdp_cmd_off_pan_on(struct mdss_mdp_ctl *ctl)
 	spin_unlock_irqrestore(&ctx->clk_lock, flags);
 
 	if (need_wait) {
-		if (wait_for_completion_timeout(&ctx->stop_comp, STOP_TIMEOUT)
+		int idle = 0;
+		unsigned long timeout = STOP_TIMEOUT;
+
+		if (ctl->panel_data->get_idle)
+			idle = ctl->panel_data->get_idle(ctl->panel_data);
+
+		if (idle)
+			timeout = msecs_to_jiffies(pinfo->idle_ms_per_frame *
+					(VSYNC_EXPIRE_TICK + 2));
+
+		if (wait_for_completion_timeout(&ctx->stop_comp, timeout)
 		    <= 0) {
 			pr_debug("%s: stop cmd time out\n", __func__);
 			mdss_mdp_irq_disable(MDSS_MDP_IRQ_PING_PONG_RD_PTR,
@@ -636,6 +664,7 @@ int mdss_mdp_cmd_off_pan_on(struct mdss_mdp_ctl *ctl)
 int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl)
 {
 	struct mdss_mdp_cmd_ctx *ctx;
+	struct mdss_panel_info *pinfo;
 	unsigned long flags;
 	struct mdss_mdp_vsync_handler *tmp, *handle;
 	int need_wait = 0;
@@ -646,6 +675,8 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl)
 		pr_err("invalid ctx\n");
 		return -ENODEV;
 	}
+
+	pinfo = &ctl->panel_data->panel_info;
 
 	list_for_each_entry_safe(handle, tmp, &ctx->vsync_handlers, list) {
 		list_add(&handle->saved_list, &ctl->saved_vsync_handlers);
@@ -660,7 +691,17 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl)
 	spin_unlock_irqrestore(&ctx->clk_lock, flags);
 
 	if (need_wait) {
-		if (wait_for_completion_timeout(&ctx->stop_comp, STOP_TIMEOUT)
+		int idle = 0;
+		unsigned long timeout = STOP_TIMEOUT;
+
+		if (ctl->panel_data->get_idle)
+			idle = ctl->panel_data->get_idle(ctl->panel_data);
+
+		if (idle)
+			timeout = msecs_to_jiffies(pinfo->idle_ms_per_frame *
+					(VSYNC_EXPIRE_TICK + 2));
+
+		if (wait_for_completion_timeout(&ctx->stop_comp, timeout)
 		    <= 0) {
 			WARN(1, "stop cmd time out\n");
 			mdss_mdp_irq_disable
