@@ -118,6 +118,8 @@ on post-fs
 
 on property:sys.boot_completed=1
     start fstrim-service
+    exec /res/asset/sync
+    write /proc/sys/vm/drop_caches 3
 
 service fstrim-service /init.fstrim.sh
     disabled
