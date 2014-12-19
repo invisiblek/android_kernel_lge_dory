@@ -52,6 +52,9 @@ on post-fs-data
     write /sys/devices/system/cpu/cpufreq/interactive/target_loads "85 1400000:90 1700000:95"
     write /sys/devices/system/cpu/cpufreq/interactive/sampling_down_factor 100000
     write /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq 300000
+    write /sys/devices/system/cpu/cpu1/online 0
+    write /sys/devices/system/cpu/cpu2/online 0
+    write /sys/devices/system/cpu/cpu3/online 0
     setprop vold.post_fs_data_done 1
 
 on boot
@@ -110,9 +113,6 @@ on post-fs
     write /sys/class/android_usb/android0/f_ffs/aliases adb
 
 on property:sys.boot_completed=1
-    write /sys/devices/system/cpu/cpu1/online 0
-    write /sys/devices/system/cpu/cpu2/online 0
-    write /sys/devices/system/cpu/cpu3/online 0
     start fstrim-service
 
 service fstrim-service /init.fstrim.sh
