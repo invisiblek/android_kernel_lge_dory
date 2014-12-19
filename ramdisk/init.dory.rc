@@ -98,6 +98,10 @@ on boot
 
 on fs
     mount_all /fstab.dory
+
+    start fs_mount
+    wait /dev/block/mounted
+
     setprop ro.crypto.fuse_sdcard true
 
 on post-fs
@@ -119,6 +123,11 @@ service fstrim-service /init.fstrim.sh
     disabled
     user root
     oneshot
+
+service fs_mount /init.mount.sh
+    user root
+    oneshot
+    disabled
 
 # dhcp daemon for bt tethering
 service dhcpcd_bt-pan /system/bin/dhcpcd -BKLG
