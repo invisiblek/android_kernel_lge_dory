@@ -97,10 +97,10 @@ on boot
     setprop config.disable_networktime true
 
 on fs
-    mount_all /fstab.dory
-
     start fs_mount
     wait /dev/block/mounted
+
+    mount_all /fstab.dory
 
     setprop ro.crypto.fuse_sdcard true
 
