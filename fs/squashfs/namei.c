@@ -104,8 +104,10 @@ static int get_dir_index_using_name(struct super_block *sb,
 
 
 		size = le32_to_cpu(index->size) + 1;
-		if (size > SQUASHFS_NAME_LEN)
+		if (size > SQUASHFS_NAME_LEN) {
+			err = -EINVAL;
 			break;
+		}
 
 		err = squashfs_read_metadata(sb, index->name, &index_start,
 					&index_offset, size);
