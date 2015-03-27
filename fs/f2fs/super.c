@@ -59,6 +59,7 @@ enum {
 	Opt_nobarrier,
 	Opt_fastboot,
 	Opt_extent_cache,
+	Opt_noinline_data,
 	Opt_err,
 };
 
@@ -82,6 +83,7 @@ static match_table_t f2fs_tokens = {
 	{Opt_nobarrier, "nobarrier"},
 	{Opt_fastboot, "fastboot"},
 	{Opt_extent_cache, "extent_cache"},
+	{Opt_noinline_data, "noinline_data"},
 	{Opt_err, NULL},
 };
 
@@ -377,6 +379,9 @@ static int parse_options(struct super_block *sb, char *options)
 		case Opt_extent_cache:
 			set_opt(sbi, EXTENT_CACHE);
 			break;
+		case Opt_noinline_data:
+			clear_opt(sbi, INLINE_DATA);
+			break;
 		default:
 			f2fs_msg(sb, KERN_ERR,
 				"Unrecognized mount option \"%s\" or missing value",
@@ -601,6 +606,8 @@ static int f2fs_show_options(struct seq_file *seq, struct dentry *root)
 		seq_puts(seq, ",disable_ext_identify");
 	if (test_opt(sbi, INLINE_DATA))
 		seq_puts(seq, ",inline_data");
+	else
+		seq_puts(seq, ",noinline_data");
 	if (test_opt(sbi, INLINE_DENTRY))
 		seq_puts(seq, ",inline_dentry");
 	if (!f2fs_readonly(sbi->sb) && test_opt(sbi, FLUSH_MERGE))
@@ -971,7 +978,7 @@ static int f2fs_fill_super(struct super_block *sb, void *data, int silent)
 	struct buffer_head *raw_super_buf;
 	struct inode *root;
 	long err = -EINVAL;
-	bool retry = true;
+	bool retry = true, need_fsck = false;
 	char *options = NULL;
 	int i;
 
@@ -996,6 +1003,7 @@ try_onemore:
 	sbi->active_logs = NR_CURSEG_TYPE;
 
 	set_opt(sbi, BG_GC);
+	set_opt(sbi, INLINE_DATA);
 
 #ifdef CONFIG_F2FS_FS_XATTR
 	set_opt(sbi, XATTR_USER);
@@ -1032,7 +1040,6 @@ try_onemore:
 	sbi->raw_super = raw_super;
 	sbi->raw_super_buf = raw_super_buf;
 	mutex_init(&sbi->gc_mutex);
-	mutex_init(&sbi->writepages);
 	mutex_init(&sbi->cp_mutex);
 	init_rwsem(&sbi->node_write);
 	clear_sbi_flag(sbi, SBI_POR_DOING);
@@ -1160,9 +1167,6 @@ try_onemore:
 	if (err)
 		goto free_proc;
 
-	if (!retry)
-		set_sbi_flag(sbi, SBI_NEED_FSCK);
-
 	/* recover fsynced data */
 	if (!test_opt(sbi, DISABLE_ROLL_FORWARD)) {
 		/*
@@ -1174,8 +1178,13 @@ try_onemore:
 			err = -EROFS;
 			goto free_kobj;
 		}
+
+		if (need_fsck)
+			set_sbi_flag(sbi, SBI_NEED_FSCK);
+
 		err = recover_fsync_data(sbi);
 		if (err) {
+			need_fsck = true;
 			f2fs_msg(sb, KERN_ERR,
 				"Cannot recover all fsync data errno=%ld", err);
 			goto free_kobj;
@@ -1328,6 +1337,7 @@ static void __exit exit_f2fs_fs(void)
 	remove_proc_entry("fs/f2fs", NULL);
 	f2fs_destroy_root_stats();
 	unregister_filesystem(&f2fs_fs_type);
+	destroy_extent_cache();
 	destroy_checkpoint_caches();
 	destroy_segment_manager_caches();
 	destroy_node_manager_caches();
