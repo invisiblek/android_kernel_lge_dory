@@ -141,7 +141,7 @@ static struct msm_gpiomux_config melfas_fx_configs[] = {
 
 int mms100_set_gpio_mux(char mode, struct melfas_tsi_platform_data *pdata)
 {
-	int ret;
+	int ret = 0;
 
 	melfas_gpio_configs[0].gpio = pdata->i2c_sda_gpio;
 	melfas_i2c_configs[0].gpio = pdata->i2c_sda_gpio;
