@@ -155,7 +155,7 @@ struct smartmax_info_s {
 };
 static DEFINE_PER_CPU(struct smartmax_info_s, smartmax_info);
 
-#define dprintk(flag,msg...) do { if (debug_mask & flag) pr_info("[smartmax]" ":" msg); } while (0)
+#define dprintk(flag,msg...) do { if (debug_mask & flag) pr_debug("[smartmax]" ":" msg); } while (0)
 
 enum {
 	SMARTMAX_DEBUG_JUMPS = 1,
@@ -1031,7 +1031,7 @@ static int cpufreq_smartmax_boost_task(void *data) {
 		}
 	}
 
-	pr_info("[smartmax]:" "%s boost_thread stopped\n", __func__);
+	pr_debug("[smartmax]:" "%s boost_thread stopped\n", __func__);
 	return 0;
 }
 
@@ -1055,7 +1055,7 @@ static int dbs_input_connect(struct input_handler *handler,
 	struct input_handle *handle;
 	int error;
 
-	pr_info("[smartmax]:" "%s input connect to %s\n", __func__, dev->name);
+	pr_debug("[smartmax]:" "%s input connect to %s\n", __func__, dev->name);
 
 	handle = kzalloc(sizeof(struct input_handle), GFP_KERNEL);
 	if (!handle)
@@ -1076,7 +1076,7 @@ static int dbs_input_connect(struct input_handler *handler,
 	return 0;
 	err1: input_unregister_handle(handle);
 	err2: kfree(handle);
-	pr_err("[smartmax]:" "%s faild to connect input handler %d\n", __func__, error);
+	pr_debug("[smartmax]:" "%s faild to connect input handler %d\n", __func__, error);
 	return error;
 }
 
@@ -1157,7 +1157,7 @@ static int cpufreq_governor_smartmax(struct cpufreq_policy *new_policy,
 					return PTR_ERR(boost_task);
 				}
 
-				pr_info("[smartmax]:" "%s input boost task created\n", __func__);
+				pr_debug("[smartmax]:" "%s input boost task created\n", __func__);
 				sched_setscheduler_nocheck(boost_task, SCHED_FIFO, &param);
 				get_task_struct(boost_task);
 				boost_task_alive = true;
