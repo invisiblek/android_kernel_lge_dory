@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, 2016, The Linux Foundation. All rights reserved.
  * Author: Brian Swetland <swetland@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -44,6 +44,7 @@
 #define FALSE       0x00
 
 #define CMD_GET_HDR_SZ 16
+#define FRAME_NUM   (8)
 
 enum {
 	ASM_TOPOLOGY_CAL = 0,
@@ -1051,6 +1052,8 @@ int q6asm_audio_client_buf_alloc(unsigned int dir,
 			pr_debug("%s: buffer already allocated\n", __func__);
 			return 0;
 		}
+		if (bufcnt != FRAME_NUM)
+			goto fail;
 		mutex_lock(&ac->cmd_lock);
 		buf = kzalloc(((sizeof(struct audio_buffer))*bufcnt),
 				GFP_KERNEL);
@@ -1141,6 +1144,12 @@ int q6asm_audio_client_buf_alloc_contiguous(unsigned int dir,
 
 	ac->port[dir].buf = buf;
 
+	/* check for integer overflow */
+	if ((bufcnt > 0) && ((INT_MAX / bufcnt) < bufsz)) {
+		pr_err("%s: integer overflow\n", __func__);
+		mutex_unlock(&ac->cmd_lock);
+		goto fail;
+	}
 	bytes_to_alloc = bufsz * bufcnt;
 
 	/* The size to allocate should be multiple of 4K bytes */

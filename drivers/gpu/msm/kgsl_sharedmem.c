@@ -398,7 +398,7 @@ static void kgsl_page_alloc_free(struct kgsl_memdesc *memdesc)
 	/* we certainly do not expect the hostptr to still be mapped */
 	BUG_ON(memdesc->hostptr);
 
-	if (memdesc->sg)
+	if (sglen && memdesc->sg)
 		for_each_sg(memdesc->sg, sg, sglen, i)
 			__free_pages(sg_page(sg), get_order(sg->length));
 }
@@ -576,6 +576,10 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 	unsigned int align;
 	int step = ((VMALLOC_END - VMALLOC_START)/8) >> PAGE_SHIFT;
 
+	size = PAGE_ALIGN(size);
+	if (size == 0 || size > UINT_MAX)
+		return -EINVAL;
+
 	align = (memdesc->flags & KGSL_MEMALIGN_MASK) >> KGSL_MEMALIGN_SHIFT;
 
 	page_size = get_page_size(size, align);
@@ -598,6 +602,9 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 	memdesc->pagetable = pagetable;
 	memdesc->ops = &kgsl_page_alloc_ops;
 
+	/* Check for integer overflow */
+	if (sglen_alloc && (sizeof(struct scatterlist) > INT_MAX / sglen_alloc))
+		return -EINVAL;
 	memdesc->sg = kgsl_malloc(sglen_alloc * sizeof(struct scatterlist));
 
 	if (memdesc->sg == NULL) {
@@ -659,6 +666,9 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 			memdesc->sglen = sglen;
 			memdesc->size = (size - len);
 
+			if (sglen > 0)
+				sg_mark_end(&memdesc->sg[sglen - 1]);
+
 			KGSL_CORE_ERR(
 				"Out of memory: only allocated %zuKB of %zuKB requested\n",
 				(size - len) >> 10, size >> 10);
@@ -676,6 +686,9 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 
 	memdesc->sglen = sglen;
 	memdesc->size = size;
+
+	if (sglen > 0)
+		sg_mark_end(&memdesc->sg[sglen - 1]);
 
 	/*
 	 * All memory that goes to the user has to be zeroed out before it gets
